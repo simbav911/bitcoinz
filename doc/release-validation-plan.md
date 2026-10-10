@@ -47,6 +47,25 @@ acceptance. Revalidate any changed runtime code and record exact artifact hashes
    matrix; finish all applicable checks; record remaining limitations; prepare
    signatures and final release notes. Publication is a separate action.
 
+## Evaluation evidence added on 2026-10-10
+
+The native Linux x86_64 evaluation artifact is frozen at source
+`9b8215fd575c18f456c8c40e5eff19973429e62b`. Documentation may advance separately.
+[The native CI run](https://github.com/simbav911/bitcoinz/actions/runs/38049142520)
+passed all four build-identification scenarios, 45 targeted assertions, 334 Boost
+cases, 55 selected GoogleTests and the isolated Sapling wallet/restart test.
+The downloaded archive passed checksum, executable identity and wallet checks.
+
+Saved-chain checks on the same runtime source (local build `d536bc7`) passed
+strict historical rejection and opt-in level-4 reconnection of 64,087 blocks /
+97,655 transactions. After a deliberately invalidated branch was removed from
+the index at startup, offline import of 63,798 unchanged saved blocks recovered
+the original tip. See the compatibility document for the absent-index case.
+
+These results do not complete the genesis-sync, full wallet-client, other native
+platform or stable-publication gates above. The explicit historical option is
+still disabled by default.
+
 ## Running the bounded fresh-sync acceptance
 
 Install the normal verification parameters first. The binary and its source

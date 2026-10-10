@@ -35,6 +35,42 @@ The default remains strict. Enabling the exception by default for a public
 release would be an explicit historical consensus-policy change requiring
 updated tests and release documentation.
 
+## Recovering a previously stopped database
+
+Stop Core cleanly and preserve a complete backup before trying recovery in a
+separate datadir. Choose the historical policy explicitly before starting that
+copy. Merely enabling the option does not clear every persisted failure state.
+
+If the incident block still has an index entry, `reconsiderblock` can request
+another validation attempt under the selected policy. If it returns RPC -5
+(`Block not found`), repeating that command cannot help: startup may have removed
+the insufficiently validated branch from the index. This was observed after an
+isolated invalidation and restart at height 1,789,966. It does not by itself mean
+that the saved block files have been lost.
+
+An online node can obtain missing blocks again from peers. For offline recovery,
+Core also supports importing an archive of existing block bytes with `-loadblock`:
+
+```sh
+bitcoinzd -datadir=/path/to/separate-copy \
+  -experimentalaccept1789967=1 -connect=0 -dnsseed=0 -listen=0 \
+  -loadblock=/path/to/parent-ordered-blocks.dat
+```
+
+The archive must retain normal block-file framing, contain unmodified block
+payloads and put parents before their children. Raw `blk*.dat` file order is not
+guaranteed to meet this requirement; ordinary `-loadblock` imports can skip an
+unknown-parent block. A full reindex of saved block files is a separate, slower
+recovery option when an ordered archive is unavailable. Do not automatically
+delete chainstate or block files after a validation error.
+
+During an import, the header height may advance before the active block height.
+Wait for activation to finish, verify the expected block hashes and recent chain,
+then test a clean restart. An isolated Linux test recovered all 63,798 blocks from
+the incident through height 1,853,764 using unchanged saved bytes, with zero peers,
+and retained the original tip hash. This is saved-data recovery evidence, not a
+completed fresh sync from genesis or permission to change the default policy.
+
 ## Regression checks
 
 The checked-in public fixture `src/test/data/bitcoinz-1789967.dat` contains eight
