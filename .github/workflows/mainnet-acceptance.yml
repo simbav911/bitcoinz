@@ -1,0 +1,104 @@
+name: BitcoinZ native mainnet acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/linux-release-validation]
+    paths: [.github/workflows/mainnet-acceptance.yml]
+
+permissions:
+  contents: read
+  actions: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: native-mainnet-acceptance
+  cancel-in-progress: false
+
+jobs:
+  mainnet:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      CANDIDATE_RUN: '38049142520'
+      CANDIDATE_COMMIT: '9b8215fd575c18f456c8c40e5eff19973429e62b'
+      CANDIDATE_ARCHIVE_SHA256: '359f3d437990a37326f6938fde79c8e37944b8446c26723b66fe6a7b2abe206a'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout acceptance runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare isolated runner storage
+        run: |
+          # This job uses an ephemeral hosted VM and does not build Android software.
+          sudo rm -rf /usr/local/lib/android
+          df -h "$RUNNER_TEMP"
+
+      - name: Download the frozen successful candidate
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" > "$RUNNER_TEMP/candidate-run.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          run = json.loads((Path(os.environ['RUNNER_TEMP']) / 'candidate-run.json').read_text())
+          assert run['conclusion'] == 'success'
+          assert run['head_sha'] == os.environ['CANDIDATE_COMMIT']
+          PY
+          gh run download "$CANDIDATE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "bitcoinz-linux-x86_64-$CANDIDATE_COMMIT" --dir "$RUNNER_TEMP/candidate"
+
+      - name: Verify and extract the exact archive
+        id: candidate
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess, tarfile
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'candidate'
+          commit = os.environ['CANDIDATE_COMMIT']
+          archive = root / ('bitcoinz-' + commit[:12] + '-linux-x86_64-evaluation.tar.gz')
+          assert hashlib.file_digest(archive.open('rb'), 'sha256').hexdigest() == os.environ['CANDIDATE_ARCHIVE_SHA256']
+          with tarfile.open(archive) as source:
+              source.extractall(root, filter='data')
+          extracted = root / archive.name[:-7]
+          subprocess.run(['sha256sum', '-c', 'SHA256SUMS'], cwd=extracted, check=True)
+          manifest = json.loads((extracted / 'BUILD-MANIFEST.json').read_text())
+          assert manifest['source_commit'] == commit and manifest['wallet_enabled']
+          assert manifest['historical_exception_default'] is False
+          binary = extracted / 'bin/bitcoinzd'
+          version = subprocess.check_output([str(binary), '--version'], text=True).splitlines()[0]
+          assert version == manifest['binaries']['bitcoinzd']['version'] and commit[:12] in version
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('binary=' + str(binary) + '\n')
+          PY
+
+      - name: Fetch verified parameters
+        run: ./zcutil/fetch-params.sh
+
+      - name: Synchronize from genesis and verify restart
+        env:
+          CANDIDATE_BINARY: ${{ steps.candidate.outputs.binary }}
+        run: |
+          python3 contrib/devtools/validate-fresh-sync.py \
+            --binary "$CANDIDATE_BINARY" --source-commit "$CANDIDATE_COMMIT" \
+            --root "$RUNNER_TEMP/mainnet-acceptance" --hours 2.25 \
+            --accept-historical --wallet-server-index \
+            --addnode seed.minebtcz.com:1989 \
+            --addnode 152.53.180.255:1989 --addnode 109.199.122.150:1989
+
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bitcoinz-native-mainnet-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/candidate-run.json
+            ${{ runner.temp }}/mainnet-acceptance/status.json
+            ${{ runner.temp }}/mainnet-acceptance/samples.jsonl
+            ${{ runner.temp }}/mainnet-acceptance/result.json
+            ${{ runner.temp }}/mainnet-acceptance/*.log
+          retention-days: 14
