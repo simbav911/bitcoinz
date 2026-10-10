@@ -1,46 +1,96 @@
-name: BitcoinZ Linux (x86_64)
+name: BitcoinZ Linux candidate validation
 
 on:
   workflow_dispatch:
+  push:
+    branches: [work/linux-release-validation]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: linux-candidate-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   linux-build:
-    name: Linux (x86_64)
-    runs-on: ubuntu-latest
+    name: Linux x86_64 wallet and validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
 
     env:
       HOST: x86_64-pc-linux-gnu
+      CONFIGURE_FLAGS: --enable-wallet --without-gui --enable-tests --disable-bench
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+          persist-credentials: false
 
       - name: Install build depends
         run: |
-          sudo apt update
-          sudo apt install -y \
+          sudo apt-get update
+          sudo apt-get install -y \
             build-essential pkg-config libc6-dev m4 g++-multilib \
             autoconf libtool libncurses-dev unzip git python3 \
-            zlib1g-dev wget bsdmainutils automake cmake
-
-      - name: Build depends
-        run: |
-          cd depends
-          make -j$(nproc)
-          cd ..
+            zlib1g-dev wget bsdextrautils automake cmake
 
       - name: Build BitcoinZ
         run: |
-          CONFIG_SITE=$PWD/depends/${HOST}/share/config.site
-          ./zcutil/build.sh -j$(nproc)
+          ./zcutil/build.sh -j2 2>&1 | tee "$RUNNER_TEMP/build.log"
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Fetch verified proving parameters
+        run: ./zcutil/fetch-params.sh
+
+      - name: Check build identification
+        run: |
+          python3 contrib/devtools/test-build-version.py \
+            --boost-include "depends/${HOST}/include" 2>&1 | tee "$RUNNER_TEMP/version-tests.log"
+
+      - name: Run consensus and wallet unit tests
+        run: |
+          cd src/test
+          ./test_bitcoinz --run_test='CheckBlock*' --log_level=test_suite --report_level=detailed \
+            2>&1 | tee "$RUNNER_TEMP/targeted-tests.log"
+          ./test_bitcoinz --log_level=error --report_level=short \
+            2>&1 | tee "$RUNNER_TEMP/boost-tests.log"
+          cd ..
+          ./bitcoinz-gtest --gtest_filter='CheckBlock.*:ChecktransactionTests.*:ContextualCheckBlockTest.*' \
+            2>&1 | tee "$RUNNER_TEMP/google-tests.log"
+
+      - name: Exercise isolated Sapling wallet and restart
+        run: |
+          python3 contrib/devtools/validate-wallet-regtest.py \
+            --binary "$PWD/src/bitcoinzd" --root "$RUNNER_TEMP/wallet-regtest" \
+            2>&1 | tee "$RUNNER_TEMP/wallet-tests.log"
+
+      - name: Package the tested binaries
+        run: |
+          python3 contrib/devtools/package-evaluation.py --output "$RUNNER_TEMP/packages"
+          cd "$RUNNER_TEMP/packages"
+          sha256sum -c ./*.sha256
+
+      - name: Upload evaluation package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: bitcoinz-linux-x86_64
+          name: bitcoinz-linux-x86_64-${{ github.sha }}
+          path: ${{ runner.temp }}/packages/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bitcoinz-linux-tests-${{ github.sha }}
           path: |
-            src/bitcoinzd
-            src/bitcoinz-cli
-            src/bitcoinz-tx
+            ${{ runner.temp }}/build.log
+            ${{ runner.temp }}/*-tests.log
+            ${{ runner.temp }}/wallet-regtest/result.json
+          retention-days: 14
