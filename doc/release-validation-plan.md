@@ -81,3 +81,18 @@ python3 contrib/devtools/test-build-version.py \
 
 This compiles the real version formatter using metadata generated from temporary
 clean, tagged and dirty Git fixtures, plus the explicit no-Git fallback.
+
+## Wallet acceptance on regtest
+
+After building with wallet support and installing the verification parameters:
+
+```sh
+python3 contrib/devtools/validate-wallet-regtest.py \
+  --binary /absolute/path/to/bitcoinzd \
+  --root /absolute/path/to/new-wallet-acceptance-directory
+```
+
+This creates an isolated wallet, mines valueless regtest coins, shields a coinbase
+output, sends between two Sapling addresses with a memo, verifies the received
+balance/memo, verifies the chain and checks the balance after restart. RPC is
+loopback-only and P2P is disabled. No mainnet transaction is constructed or sent.
