@@ -25,6 +25,8 @@ jobs:
     env:
       HOST: x86_64-pc-linux-gnu
       CONFIGURE_FLAGS: --enable-wallet --without-gui --enable-tests --disable-bench
+      # Use libsodium's checksum-verified archive scripts, not unpinned GNU HEAD downloads.
+      DO_NOT_UPDATE_CONFIG_SCRIPTS: 1
 
     steps:
       - name: Checkout source
