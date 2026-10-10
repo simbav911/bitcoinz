@@ -85,7 +85,7 @@ jobs:
         run: |
           python3 contrib/devtools/validate-fresh-sync.py \
             --binary "$CANDIDATE_BINARY" --source-commit "$CANDIDATE_COMMIT" \
-            --root "$RUNNER_TEMP/mainnet-acceptance" --hours 5.5 \
+            --root "$RUNNER_TEMP/mainnet-acceptance" --hours 5.75 \
             --accept-historical --wallet-server-index \
             --addnode seed.minebtcz.com:1989 \
             --addnode 152.53.180.255:1989 --addnode 109.199.122.150:1989

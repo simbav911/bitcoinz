@@ -62,9 +62,10 @@ strict historical rejection and opt-in level-4 reconnection of 64,087 blocks /
 the index at startup, offline import of 63,798 unchanged saved blocks recovered
 the original tip. See the compatibility document for the absent-index case.
 
-These results do not complete the genesis-sync, full wallet-client, other native
-platform or stable-publication gates above. The explicit historical option is
-still disabled by default.
+These initial results did not complete the genesis-sync or full wallet-client
+gates. Later local results are recorded below; other native-platform and
+stable-publication checks remain open. The explicit historical option is still
+disabled by default.
 
 The first native genesis run (`38051743722`) reached 718,619 blocks with two peers
 before its 2.25-hour deadline. It recorded zero RPC-unavailable samples and a clean
@@ -74,6 +75,21 @@ six-hour hosted job and emits periodic progress to its log. The local 24-hour
 genesis test remains a separate run. Neither run substitutes for its actual
 full-sync/restart result. Documentation and acceptance-only changes do not rebuild
 or change the frozen Core artifact.
+
+The local 24-hour acceptance completed on October 10 at 19:35 UTC: new-datadir
+sync to 1,854,011, a further block at the live tip, incident-hash check, recent
+level-4 verification, clean stop and offline restart preserving the tip all
+passed. This used the exact native archive under ARM emulation with the explicit
+historical option and wallet-server index enabled. A copied, stopped database
+then passed an actual empty-wallet client scan of 1,000 recent blocks, save/reopen
+and repeat synchronization, finishing at 19:38 UTC. No existing user wallet or
+mainnet transfer was involved; application-specific evidence remains private.
+
+Native run 38060634630 reached peer tip 1,854,030 but its 5.5-hour deadline expired
+while awaiting the required further block. Zero RPC-unavailable samples were
+recorded and Core exited cleanly. It did not run the final verification/restart,
+so it is incomplete. The next native acceptance permits 5.75 hours within the
+six-hour job, preserving a cleanup allowance and the exact frozen artifact.
 
 ## Running the bounded fresh-sync acceptance
 

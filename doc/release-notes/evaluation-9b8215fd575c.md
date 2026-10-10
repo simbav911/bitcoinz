@@ -1,8 +1,9 @@
 # Linux evaluation candidate 9b8215fd575c
 
-This is an evaluation build for validating synchronization and recovery. Full
-genesis acceptance and stable release preparation are still pending. No stable
-version or default historical consensus-policy change is announced here.
+This is an evaluation build for validating synchronization and recovery. Local
+genesis acceptance passed; the native hosted acceptance and stable release
+preparation remain incomplete. No stable version or default historical
+consensus-policy change is announced here.
 
 ## What changed
 
@@ -52,9 +53,23 @@ in the [validation plan](../release-validation-plan.md).
 
 The first native genesis attempt reached 718,619 blocks before its 2.25-hour
 deadline. It retained two peers, recorded no RPC-unavailable samples, and shut
-down cleanly. It did not complete full synchronization. Longer genesis runs and
-full wallet-client acceptance remain pending; a passing build is not a passing
-full-sync result.
+down cleanly. It did not complete full synchronization.
+
+The exact archive subsequently passed a new-datadir genesis acceptance on Ubuntu
+amd64 under ARM emulation, reaching height 1,854,011 in about 7 h 40 min. With the
+historical option and wallet-server indexing enabled, it followed another block,
+checked the incident hash, passed recent level-4 verification, and retained the
+same chain after an offline restart. Both shutdowns were clean. An actual wallet
+client then scanned 1,000 recent blocks through a wallet server using a new empty
+wallet, saved/reopened it at the same height and repeated synchronization. This
+does not establish funded wallet receive/send or desktop-client acceptance.
+
+The second native hosted run (38060634630) reached the current peer tip at
+1,854,030 blocks with two peers and no RPC-unavailable samples. Its 5.5-hour limit
+expired while waiting for an additional block, before final verification and
+restart. Core shut down cleanly, but the acceptance remains incomplete. The next
+run allows 5.75 hours within the six-hour hosted job, using the same frozen
+artifact. No Core runtime or historical-policy change accompanies this retry.
 
 For evaluation, use a separate datadir and explicitly select the historical
 option. Preserve an existing installation before attempting recovery. Turning
