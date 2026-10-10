@@ -81,6 +81,7 @@ class Run:
 
     def start(self, name, online):
         with socket.socket() as check:
+            check.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             check.bind(('127.0.0.1', self.args.rpc_port))
         config = self.root / (name + '.conf')
         config.write_text(

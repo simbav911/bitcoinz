@@ -53,6 +53,7 @@ def main():
     def start(name):
         nonlocal proc, log, phase
         with socket.socket() as check:
+            check.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             check.bind(('127.0.0.1', args.rpc_port))
         phase = {'name': name}
         result['phases'].append(phase)
@@ -70,7 +71,6 @@ def main():
                 continue
             if info['chain'] != 'regtest' or rpc('getconnectioncount') != 0:
                 raise RuntimeError('Regtest isolation check failed')
-            rpc('getwalletinfo')  # Fail if this is a wallet-disabled build.
             return info
         raise RuntimeError('Regtest startup deadline')
 
@@ -105,6 +105,17 @@ def main():
             time.sleep(1)
         raise RuntimeError('Shielded operation deadline')
 
+    def settle_wallet():
+        # Block acceptance precedes asynchronous wallet notifications. Use the
+        # same regtest barriers as the node's functional-test framework.
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            if (rpc('getblockchaininfo')['fullyNotified'] and
+                    rpc('getmempoolinfo')['fullyNotified']):
+                return
+            time.sleep(0.2)
+        raise RuntimeError('Wallet notification deadline')
+
     def interrupted(*_):
         raise KeyboardInterrupt('Stop requested')
 
@@ -112,17 +123,23 @@ def main():
     try:
         start('wallet-send')
         rpc('generate', [101], timeout=300)
+        settle_wallet()
+        # A genesis-only chain is in IBD; wallet RPCs intentionally return -28
+        # until the regtest chain has a current tip. Mining requires the wallet.
+        rpc('getwalletinfo')
         source = rpc('z_getnewaddress', ['sapling'])
         recipient = rpc('z_getnewaddress', ['sapling'])
         shield = rpc('z_shieldcoinbase', ['*', source, 0.0001, 1])
         result['shield_txid'] = operation(shield['opid'])
         rpc('generate', [1])
+        settle_wallet()
         if rpc('z_getbalance', [source]) <= 1:
             raise RuntimeError('Shielded coinbase did not arrive')
         memo = b'Core candidate wallet regression'.hex()
         result['send_txid'] = operation(rpc('z_sendmany', [source,
             [{'address': recipient, 'amount': 1, 'memo': memo}], 1, 0.0001]))
         rpc('generate', [1])
+        settle_wallet()
         if rpc('z_getbalance', [recipient]) != 1:
             raise RuntimeError('Sapling recipient balance mismatch')
         received = rpc('z_listreceivedbyaddress', [recipient])
@@ -133,6 +150,7 @@ def main():
         before = rpc('getblockchaininfo')
         stop()
         after = start('wallet-restart')
+        settle_wallet()
         if after['bestblockhash'] != before['bestblockhash'] or rpc('z_getbalance', [recipient]) != 1:
             raise RuntimeError('Wallet/chain state changed on restart')
         if rpc('getconnectioncount') != 0:
