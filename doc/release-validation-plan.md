@@ -57,7 +57,7 @@ python3 contrib/devtools/validate-fresh-sync.py \
   --binary /absolute/path/to/bitcoinzd \
   --source-commit FULL_COMMIT_SHA \
   --root /absolute/path/to/new-acceptance-directory \
-  --accept-historical --addnode seed.minebtcz.com:1989
+  --accept-historical --wallet-server-index --addnode seed.minebtcz.com:1989
 ```
 
 The runner uses loopback cookie-authenticated RPC, disables listening and wallet
@@ -71,6 +71,11 @@ ten minutes and is never force-killed by this runner.
 Serial script checking (`par=1`) is used because the earlier emulated Linux
 environment produced script failures with parallel checking. This is a test
 environment workaround, not evidence of the behavior of native hardware.
+
+`--wallet-server-index` also builds the lightwalletd address index from the start.
+Omit it when evaluating a standalone Core without that index. Changing this
+index setting on an existing database requires reindexing; enabling it at first
+startup avoids repeating the work for later wallet-server integration.
 
 ## Build identification regression
 

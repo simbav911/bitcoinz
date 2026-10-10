@@ -44,6 +44,7 @@ class Run:
             'daemon_sha256': hashlib.sha256(self.core.read_bytes()).hexdigest(),
             'initial_datadir_empty': True, 'copied_chain_data': False,
             'historical_option': args.accept_historical,
+            'wallet_server_index': args.wallet_server_index,
             'fresh_sync_from_genesis_verified': False, 'phases': [],
         }
 
@@ -86,8 +87,10 @@ class Run:
             'server=1\nlisten=0\ndiscover=0\nupnp=0\ndisablewallet=1\n'
             'rpcbind=127.0.0.1\nrpcallowip=127.0.0.1\n'
             'rpcport=' + str(self.args.rpc_port) + '\n'
+            'rpccookiefile=' + str(self.data / '.cookie') + '\n'
             'txindex=1\npar=1\ndbcache=600\nchecklevel=4\ncheckblocks=288\n'
             'experimentalaccept1789967=' + str(int(self.args.accept_historical)) + '\n' +
+            ('experimentalfeatures=1\nlightwalletd=1\n' if self.args.wallet_server_index else '') +
             ('maxconnections=8\n' + ''.join('addnode=' + peer + '\n' for peer in self.args.addnode)
              if online else 'connect=0\ndnsseed=0\nmaxconnections=0\n'))
         self.phase = {'name': name, 'online': online, 'started_at': time.time()}
@@ -215,6 +218,8 @@ def main():
     parser.add_argument('--addnode', action='append', default=[])
     parser.add_argument('--accept-historical', action='store_true',
                         help='Explicitly opt in to the exact historical mainnet exception')
+    parser.add_argument('--wallet-server-index', action='store_true',
+                        help='Build the optional lightwalletd address index from genesis')
     args = parser.parse_args()
     if not args.binary.is_file() or not os.access(args.binary, os.X_OK):
         parser.error('binary must be an executable file')

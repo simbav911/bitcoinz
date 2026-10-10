@@ -105,6 +105,10 @@ def main():
             time.sleep(1)
         raise RuntimeError('Shielded operation deadline')
 
+    def interrupted(*_):
+        raise KeyboardInterrupt('Stop requested')
+
+    signal.signal(signal.SIGTERM, interrupted)
     try:
         start('wallet-send')
         rpc('generate', [101], timeout=300)
