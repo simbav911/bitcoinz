@@ -41,11 +41,14 @@ def main():
         data = binary.read_bytes()
         if not data.startswith(b'\x7fELF'):
             parser.error(name + ' is not a Linux ELF binary')
-        version = command(str(binary), '--version').splitlines()[0]
+        # The raw-transaction utility exposes its version in help only.
+        version_argument = '-help' if name == 'bitcoinz-tx' else '--version'
+        version = command(str(binary), version_argument).splitlines()[0]
         if '-dirty' in version or (commit[:12] not in version and not (
                 tag.returncode == 0 and version.endswith(' ' + tag.stdout.strip()))):
             parser.error(name + ' does not identify this clean source revision: ' + version)
-        binaries[name] = {'sha256': sha(data), 'bytes': len(data), 'version': version}
+        binaries[name] = {'sha256': sha(data), 'bytes': len(data), 'version': version,
+                          'version_argument': version_argument}
         files['bin/' + name] = (data, 0o755)
     configuration = command('sh', str(source / 'config.status'), '--config')
     header = (source / 'src/config/bitcoin-config.h').read_text()
