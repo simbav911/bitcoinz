@@ -66,6 +66,15 @@ These results do not complete the genesis-sync, full wallet-client, other native
 platform or stable-publication gates above. The explicit historical option is
 still disabled by default.
 
+The first native genesis run (`38051743722`) reached 718,619 blocks with two peers
+before its 2.25-hour deadline. It recorded zero RPC-unavailable samples and a clean
+Core shutdown. This is an incomplete sync, not a passing acceptance result or
+evidence of a validation stall. The next native run allows 5.5 hours inside a
+six-hour hosted job and emits periodic progress to its log. The local 24-hour
+genesis test remains a separate run. Neither run substitutes for its actual
+full-sync/restart result. Documentation and acceptance-only changes do not rebuild
+or change the frozen Core artifact.
+
 ## Running the bounded fresh-sync acceptance
 
 Install the normal verification parameters first. The binary and its source

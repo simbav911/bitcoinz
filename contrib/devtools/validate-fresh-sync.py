@@ -38,6 +38,7 @@ class Run:
         self.log = None
         self.phase = None
         self.stopping = False
+        self.last_console_status = 0
         self.result = {
             'started_at': time.time(), 'outcome': 'running',
             'source_commit': args.source_commit,
@@ -68,6 +69,11 @@ class Run:
         save(self.root / 'status.json', status)
         with (self.root / 'samples.jsonl').open('a') as output:
             output.write(json.dumps(status) + '\n')
+        # Hosted CI does not expose the working directory while a job is active.
+        # Emit bounded progress as well as retaining the machine-readable files.
+        if stage != 'syncing' or time.monotonic() - self.last_console_status >= 60:
+            print(json.dumps(status), flush=True)
+            self.last_console_status = time.monotonic()
 
     def check_limits(self):
         if self.stopping or (self.root / 'STOP').exists():

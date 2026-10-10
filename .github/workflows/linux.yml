@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches: [work/linux-release-validation]
+    paths-ignore:
+      - 'doc/**'
+      - '.github/workflows/mainnet-acceptance.yml'
+      - 'contrib/devtools/validate-fresh-sync.py'
 
 permissions:
   contents: read

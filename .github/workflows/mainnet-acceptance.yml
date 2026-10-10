@@ -21,7 +21,7 @@ concurrency:
 jobs:
   mainnet:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       CANDIDATE_RUN: '38049142520'
       CANDIDATE_COMMIT: '9b8215fd575c18f456c8c40e5eff19973429e62b'
@@ -85,7 +85,7 @@ jobs:
         run: |
           python3 contrib/devtools/validate-fresh-sync.py \
             --binary "$CANDIDATE_BINARY" --source-commit "$CANDIDATE_COMMIT" \
-            --root "$RUNNER_TEMP/mainnet-acceptance" --hours 2.25 \
+            --root "$RUNNER_TEMP/mainnet-acceptance" --hours 5.5 \
             --accept-historical --wallet-server-index \
             --addnode seed.minebtcz.com:1989 \
             --addnode 152.53.180.255:1989 --addnode 109.199.122.150:1989
