@@ -29,8 +29,9 @@ Daemon SHA-256:
 The package contains the wallet-enabled daemon, RPC client, transaction utility,
 build manifest, per-file checksums, sample configuration and recovery guide.
 It was built and tested on Ubuntu 24.04 x86_64. There is no GUI in this package.
-ELF inspection finds a glibc 2.38 symbol requirement; the host must also provide
-the required libstdc++/libgcc runtime. Do not assume it runs on older Linux
+ELF inspection finds glibc 2.38 and libstdc++ `GLIBCXX_3.4.32` requirements; the
+daemon also requires `CXXABI_1.3.13`. The host must provide compatible C++/libgcc
+runtime libraries. Do not assume it runs on older Linux
 distributions merely because they use x86_64. Other platforms and distribution
 signatures have not been validated for this candidate.
 
