@@ -239,54 +239,55 @@ BOOST_AUTO_TEST_CASE(rpc_wallet)
     auto check_funding_streams = [](UniValue obj, std::vector<std::string> recipients, std::vector<double> amounts, std::vector<std::string> addresses) {
         size_t n = recipients.size();
         BOOST_REQUIRE_EQUAL(amounts.size(), n);
+        BOOST_REQUIRE_EQUAL(addresses.size(), n);
         UniValue fundingstreams = obj.find_value("fundingstreams");
-        BOOST_CHECK_EQUAL(fundingstreams.size(), n);
-        if (fundingstreams.size() != n) return;
+        BOOST_REQUIRE_EQUAL(fundingstreams.size(), n);
 
         for (int i = 0; i < n; i++) {
             UniValue fsobj = fundingstreams[i];
             BOOST_CHECK_EQUAL(fsobj.find_value("recipient").get_str(), recipients[i]);
             BOOST_CHECK_EQUAL(fsobj.find_value("specification").get_str(), "https://zips.z.cash/zip-0214");
             BOOST_CHECK_EQUAL(fsobj.find_value("value").get_real(), amounts[i]);
+            BOOST_CHECK_EQUAL(fsobj.find_value("valueZat").getInt<int64_t>(), CAmount(amounts[i] * COIN));
             BOOST_CHECK_EQUAL(fsobj.find_value("address").get_str(), addresses[i]);
         }
     };
 
-    bool canopyEnabled =
-        Params().GetConsensus().vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight != Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-
-    // slow start
+    // BitcoinZ activates Canopy at 1,735,000, not Zcash's 1,046,400.
     BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 1046400"));
     obj = retValue.get_obj();
-    BOOST_CHECK_EQUAL(obj.find_value("miner").get_real(), canopyEnabled ? 2.5 : 5937.5);
+    BOOST_CHECK_EQUAL(obj.find_value("miner").get_real(), 5937.5);
     BOOST_CHECK_EQUAL(obj.find_value("founders").get_real(), 312.5);
-    if (canopyEnabled) {
-        check_funding_streams(obj, {"Electric Coin Company", "Zcash Foundation", "Major Grants" },
-                                   { 0.21875,                 0.15625,            0.25          },
-                                   {
-                                       "t3LmX1cxWPPPqL4TZHx42HU3U5ghbFjRiif",
-                                       "t3dvVE3SQEi7kqNzwrfNePxZ1d4hUyztBA1",
-                                       "t3XyYW8yBFRuMnfvm5KLGFbEVz25kckZXym"
-                                   });
-    }
+    BOOST_CHECK(!obj.exists("fundingstreams"));
 
-    BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 2726399"));
+    BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 1734999"));
     obj = retValue.get_obj();
-    BOOST_CHECK_EQUAL(obj.find_value("miner").get_real(), canopyEnabled ? 2.5 : 1562.5);
+    BOOST_CHECK_EQUAL(obj.find_value("miner").get_real(), 3125.0);
     BOOST_CHECK_EQUAL(obj.find_value("founders").get_real(), 0.0);
-    if (canopyEnabled) {
-        check_funding_streams(obj, {"Electric Coin Company", "Zcash Foundation", "Major Grants" },
-                                   { 0.21875,                 0.15625,            0.25          },
-                                   {
-                                       "t3XHAGxRP2FNfhAjxGjxbrQPYtQQjc3RCQD",
-                                       "t3dvVE3SQEi7kqNzwrfNePxZ1d4hUyztBA1",
-                                       "t3XyYW8yBFRuMnfvm5KLGFbEVz25kckZXym"
-                                   });
+    BOOST_CHECK(!obj.exists("fundingstreams"));
+
+    const vector<string> recipients = {"Electric Coin Company", "Zcash Foundation", "Major Grants"};
+    const vector<string> addresses = {
+        "t3cq6DPTZbVShmY5hs4NLJyBhTfw5KNZNcf",
+        "t3LUnrQk7pHJTvTyTVzdDHNVamMGfvXAi4k",
+        "t3URkWgiiYVNTAvKHy5HdPia3hft9byrsNz"
+    };
+    // Activation, the third halving boundary, and the last funding block.
+    for (int height : {1735000, 2519999, 2520000, 3359999}) {
+        BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy " + to_string(height)));
+        obj = retValue.get_obj();
+        const bool afterHalving = height >= 2520000;
+        BOOST_CHECK_EQUAL(obj.find_value("miner").get_real(), afterHalving ? 1250.0 : 2500.0);
+        BOOST_CHECK_EQUAL(obj.find_value("founders").get_real(), 0.0);
+        check_funding_streams(obj, recipients,
+            afterHalving ? vector<double>{109.375, 78.125, 125.0} : vector<double>{218.75, 156.25, 250.0},
+            addresses);
     }
 
-    BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 2726400"));
+    // Funding ends at the fourth halving; the entire subsidy returns to miners.
+    BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 3360000"));
     obj = retValue.get_obj();
-    BOOST_CHECK_EQUAL(obj.find_value("miner").get_real(), 1562.5);
+    BOOST_CHECK_EQUAL(obj.find_value("miner").get_real(), 781.25);
     BOOST_CHECK_EQUAL(obj.find_value("founders").get_real(), 0.0);
     BOOST_CHECK(obj.find_value("fundingstreams").empty());
 

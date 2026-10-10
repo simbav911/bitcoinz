@@ -912,15 +912,28 @@ UniValue getblocksubsidy(const UniValue& params, bool fHelp)
 
     if (canopyActive) {
         UniValue fundingstreams(UniValue::VARR);
-        auto fsinfos = Consensus::GetActiveFundingStreams(nHeight, consensus);
-        for (auto fsinfo : fsinfos) {
+        KeyIO keyIO(Params());
+        for (uint32_t idx = Consensus::FIRST_FUNDING_STREAM; idx < Consensus::MAX_FUNDING_STREAMS; idx++) {
+            const auto& stream = consensus.vFundingStreams[idx];
+            if (!stream || nHeight < stream->GetStartHeight() || nHeight >= stream->GetEndHeight()) {
+                continue;
+            }
+            const auto& fsinfo = Consensus::FundingStreamInfo[idx];
             CAmount nStreamAmount = fsinfo.Value(nBlockSubsidy);
             nMinerReward -= nStreamAmount;
+
+            const auto recipient = stream->RecipientAddress(consensus, nHeight);
+            CTxDestination destination;
+            if (!ExtractDestination(std::get<CScript>(recipient), destination)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Invalid funding stream destination");
+            }
 
             UniValue fsobj(UniValue::VOBJ);
             fsobj.pushKV("recipient", fsinfo.recipient);
             fsobj.pushKV("specification", fsinfo.specification);
             fsobj.pushKV("value", ValueFromAmount(nStreamAmount));
+            fsobj.pushKV("valueZat", nStreamAmount);
+            fsobj.pushKV("address", keyIO.EncodeDestination(destination));
             fundingstreams.push_back(fsobj);
         }
         result.pushKV("fundingstreams", fundingstreams);
